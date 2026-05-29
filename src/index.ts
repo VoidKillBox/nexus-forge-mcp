@@ -30,9 +30,9 @@ if (!fs.existsSync(CONFIG_FILE)) {
           {
             name: "antigravity-skills",
             bundlesUrl:
-              "https://raw.githubusercontent.com/antigravity-ide/awesome-antigravity-skills/main/bundles.json",
+              "https://raw.githubusercontent.com/sickn33/antigravity-awesome-skills/main/skills_index.json",
             rawContentBase:
-              "https://raw.githubusercontent.com/antigravity-ide/awesome-antigravity-skills/main/skills/",
+              "https://raw.githubusercontent.com/sickn33/antigravity-awesome-skills/main/",
           },
         ],
       },
@@ -58,6 +58,7 @@ interface Bundle {
   category?: string;
   tags?: string[];
   files: string[];
+  path?: string;
 }
 
 interface CacheStructure {
@@ -154,6 +155,20 @@ function scoreBundle(
   return score;
 }
 
+// ─── Bundle Normalisation ─────────────────────────────────────────────────
+
+function normaliseBundle(raw: any): Bundle {
+  return {
+    id: raw.id || raw.name || "unknown",
+    name: raw.name || raw.id || "Unnamed Bundle",
+    description: raw.description || "",
+    category: raw.category || "uncategorised",
+    tags: raw.tags || (raw.category ? [raw.category] : []),
+    files: raw.files || ["SKILL.md"],
+    path: raw.path || "",
+  };
+}
+
 // ─── Manifest Fetching (ETag-Validated) ────────────────────────────────────
 
 async function fetchLatestManifests(
@@ -179,9 +194,15 @@ async function fetchLatestManifests(
         // Fresh data received
         const data: any = await res.json();
         const newEtag: string | null = res.headers.get("ETag");
-        cache.manifests[repo.name] = (data.bundles || []) as Bundle[];
+
+        // Handle both flat-array format (antigravity skills_index.json)
+        // and wrapped format ({ bundles: [...] })
+        const rawBundles: any[] = Array.isArray(data) ? data : (data.bundles || []);
+
+        // Normalise: ensure every bundle has required fields
+        cache.manifests[repo.name] = rawBundles.map(normaliseBundle);
         if (newEtag) cache.etags[repo.name] = newEtag;
-        cumulativeBundles.push(...(data.bundles || []));
+        cumulativeBundles.push(...cache.manifests[repo.name]);
         cacheUpdated = true;
       } else {
         // HTTP error — log degradation, fall back to cache
@@ -382,7 +403,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         // Sparse download — only the files listed in the bundle manifest
         for (const skillFile of matchedBundle.files) {
-          const targetUrl: string = `${matchingRepo.rawContentBase}${skillFile}`;
+          // If the bundle has a path (e.g. "skills/007"), prepend it
+          const filePath: string = matchedBundle.path
+            ? `${matchedBundle.path}/${skillFile}`
+            : skillFile;
+          const targetUrl: string = `${matchingRepo.rawContentBase}${filePath}`;
           const destPath: string = path.join(skillsDir, skillFile);
 
           // Support nested file paths (e.g. "tools/scanner/index.ts")
