@@ -1,0 +1,21 @@
+{
+  "name": "nexus-forge-mcp",
+  "version": "2.2.0",
+  "type": "module",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "archiver": "^7.0.1",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.1"
+  },
+  "devDependencies": {
+    "@types/archiver": "^6.0.2",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
